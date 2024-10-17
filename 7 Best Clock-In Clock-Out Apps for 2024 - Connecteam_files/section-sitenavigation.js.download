@@ -1,0 +1,165 @@
+const isDesktopStyle = () => getComputedStyle(document.querySelector(`[for='site-nav-toggle']`)).display === 'none'
+
+const $siteNav = document.querySelector('[data-site-navigation]')
+const transitionDurationRaw = getComputedStyle($siteNav).getPropertyValue('--transition-duration')
+const transitionDuration = parseFloat(transitionDurationRaw) * 1000
+
+const setOpenLevel = level => {
+  level = level >= 0 ? level : 0
+  $siteNav.style.setProperty('--open-level', level)
+}
+
+const getOpenLevel = () => $siteNav.style.getPropertyValue('--open-level')
+
+$siteNav.querySelectorAll(`[data-site-nav-top-level-item]`).forEach($item => {
+  // Top level items
+  const $input = $item.querySelector('input')
+  const on = () => {
+    if (isDesktopStyle() && $input) $input.checked = true
+  }
+  const off = () => {
+    if (isDesktopStyle() && $input) $input.checked = false
+  }
+
+  $item.addEventListener('mouseenter', on)
+  $item.addEventListener('mouseleave', off)
+
+  $item.querySelectorAll('a')
+      .forEach($a => $a.addEventListener('click', off))
+
+  const $label = $input && $item.querySelector(`[for=${$input.id}]`)
+  if ($label) {
+    $label.addEventListener('mouseup', () => {
+      setOpenLevel(1)
+    })
+  }
+
+  if (isDesktopStyle()) {
+    const $activeInput = $item.querySelector('.segments input:checked')
+    if ($activeInput) {
+      $siteNav.querySelector(`[for=${$activeInput.id}]`).classList.add('active')
+    } else {
+      const $firstSegmentInput = $item.querySelector('.segments input')
+      if ($firstSegmentInput) $firstSegmentInput.checked = true
+    }
+  }
+
+  // Segment toggles
+  const $segmentTogglesLabels = $item.querySelectorAll(`[data-site-segment-toggle-label]`)
+
+  const setSegmentTogglesLabelState = () => {
+    $segmentTogglesLabels.forEach(/** HTMLLabelElement */ $label => {
+      const $input = document.getElementById($label.htmlFor)
+      if ($input) $label.classList.toggle('active', $input.checked)
+    })
+  }
+
+  $segmentTogglesLabels.forEach(/** HTMLLabelElement */ $label => {
+    const $input = document.getElementById($label.htmlFor)
+    $label.addEventListener('mouseenter', () => {
+      if (isDesktopStyle()) {
+        $input.checked = true
+        setSegmentTogglesLabelState()
+      }
+    })
+
+    $label.addEventListener('mouseup', () => {
+      if (!isDesktopStyle()) {
+        setOpenLevel(2)
+        setSegmentTogglesLabelState()
+      }
+    })
+  })
+
+  setSegmentTogglesLabelState()
+
+  // Back button
+  $item.querySelectorAll('button[data-nav-back]').forEach(/** HTMLButtonElement */ $button => {
+    $button.addEventListener('mouseup', () => {
+      if (getOpenLevel()) {
+        setOpenLevel(getOpenLevel() - 1)
+      }
+
+      const elementId = $button.dataset.navBack
+      if (elementId) {
+        const $input = document.getElementById(elementId)
+        $siteNav.style.setProperty('pointer-events', 'none')
+        setTimeout(() => {
+          $siteNav.style.removeProperty('pointer-events')
+          if ($input) $input.checked = false
+        }, transitionDuration * 2)
+      }
+    })
+  })
+})
+// https://github.com/landjonathan/js-utils/blob/master/dom/headerClass.mjs
+const headerClass = () => {
+  const headerIdentifier = 'data-site-navigation'
+  let $siteHeader = document.querySelector(`[${headerIdentifier}]`)
+  if (!$siteHeader) return
+
+  const thresholdIdentifier = 'data-site-header-threshold'
+  const toggleClass = 'is-scrolled'
+  const thresholdOffset = 1
+
+  const $thresholdElement = document.querySelector(`[${thresholdIdentifier}]`)
+  let threshold
+  const setThreshold = () =>
+      threshold =
+          $thresholdElement
+              ? $thresholdElement
+                  .getBoundingClientRect()['top']
+              - $siteHeader.clientHeight
+              + document
+                  .documentElement
+                  .scrollTop
+              + thresholdOffset
+
+              : thresholdOffset
+
+  setThreshold()
+  const setHeaderClass = () => {
+    const force = window.scrollY >= threshold
+    $siteHeader.classList.toggle(toggleClass, force)
+  }
+  window.addEventListener('scroll', setHeaderClass, { passive: true })
+  window.addEventListener('resize', setThreshold, { passive: true })
+  setHeaderClass()
+}
+headerClass()
+
+const bodyLock = () => {
+// https://bugs.webkit.org/show_bug.cgi?id=153852
+  const lock = () => {
+    const offsetY = window.scrollY
+    document.body.style.top = `${-offsetY}px`
+    document.body.classList.add('no-scroll')
+  }
+
+  const removeLock = () => {
+    const offsetY = Math.abs(parseInt(document.body.style.top || 0, 10))
+    document.body.classList.remove('no-scroll')
+    document.body.style.removeProperty('top')
+    window.scrollTo(0, offsetY || 0)
+  }
+
+  const $siteNavToggle = document.getElementById('site-nav-toggle')
+
+  $siteNavToggle.addEventListener('input', event => {
+    if (event.target.checked) lock()
+    else removeLock()
+  })
+
+  window.addEventListener('resize', () => {
+    if (isDesktopStyle() && $siteNavToggle.checked)
+      removeLock()
+  })
+}
+bodyLock()
+
+const forceLoadLazyImages = () => {
+  $siteNav.querySelectorAll('[loading="lazy"]').forEach($img => {
+    $img.loading = 'eager'
+  })
+}
+forceLoadLazyImages()

@@ -1,0 +1,9 @@
+jQuery(document).ready(function ($) {
+  $('.section-competitors-table').each(function () {
+    const $tr = $(this).find('tr').last()
+    const height = $tr.height()
+    if (height) {
+      this.style.setProperty('--last-row-height', height + 'px')
+    }
+  })
+})

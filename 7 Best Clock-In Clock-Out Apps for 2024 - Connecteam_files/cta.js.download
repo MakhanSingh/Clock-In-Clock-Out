@@ -1,0 +1,338 @@
+(function (window) {
+  'use strict';
+
+  function define_cta() {
+    var HEARTBEAT_INTERVAL = 10;
+
+    var cta = {};
+    const path = '/bi/api/';
+    const v1Cookie = 'ct_v1_';
+    let settings = {
+      domain: 'connecteam.com',
+      local: 'localhost',
+      api_host: 'https://bi-dev.connecteam.com:8080',
+      referrer: getCookie('referrer'),
+    };
+
+    let initPromiseResolve;
+    const initPromise = new Promise(function (resolve, reject) {
+      initPromiseResolve = resolve;
+    });
+    let isSessionActive = true;
+
+    cta.init = function (api, gaId, isDev) {
+      //If on devlopement server, restrict the cookie to the devlopement settings
+      //If on a whitelabel serer restrict to whitelabel env
+      if (isDev || document.domain.indexOf(settings.domain) == -1) {
+        settings.domain = document.domain;
+      }
+      const queryString = window.location.href;
+      const urlParams = new URLSearchParams(queryString);
+
+      const clientId = urlParams.get('cta_clientId');
+      if (clientId) {
+        setCookie('clientId', clientId);
+      }
+
+      const visitId = urlParams.get('cta_v1');
+      if (visitId) {
+        setCookie(v1Cookie, visitId);
+      }
+
+      const sessionId = urlParams.get('cta_sessionId');
+      if (sessionId) {
+        setCookie('sessionId', sessionId);
+      }
+
+      settings.api_host = api;
+      settings.gaId = gaId;
+      var referrer = document.referrer;
+      if (
+          getSessionId() == null || //first time session?
+          (referrer != '' && get_hostname(referrer).indexOf(settings.domain) == -1) //  not referred from our site
+      ) {
+        //open new session,
+        this.session(resetSessionId(), false);
+      } else {
+        initSessionSync();
+      }
+
+      initHeartbeatInterval();
+      initPromiseResolve();
+      return this;
+    };
+
+    cta.session = function (sessionId, isReset = false) {
+      var properties = {};
+      var session = {};
+
+      properties['clientId'] = getClientId();
+      properties['sessionId'] = sessionId;
+      if (!isReset) {
+        setCookie(v1Cookie, sessionId);
+        properties['visitId'] = sessionId;
+      } else {
+        properties['visitId'] = getVisitId();
+      }
+
+      var date = new Date();
+      session['clientSessionStartTime'] = date.getTime();
+      session['timezone'] = date.toString().match(/([A-Z]+[\+-][0-9]+.*)/)[1];
+      session['gaId'] = settings.gaId;
+
+      settings.referrer = document.referrer;
+      setCookie('referrer', settings.referrer);
+      session['referralPath'] = settings.referrer;
+
+      session['screenResolution'] =
+          window.screen.availHeight +
+          ' x ' +
+          window.screen.availWidth +
+          ' | ' +
+          window.screen.height +
+          ' x ' +
+          window.screen.width;
+
+      session['host'] = window.location.href;
+
+      session['extra'] = {};
+      // whether or not the session is a reset of an existing session (not a visit)
+      session['extra']['isResetSession'] = isReset;
+      // check if the page was refreshed/back forward,etc
+      const navigations = performance.getEntriesByType('navigation');
+      if (navigations.length > 0) {
+        // navigations api should always return a list with 1 item
+        session['extra']['navigationType'] = navigations[0].type;
+      }
+
+      session['extra']['fbp'] = getCookie('_fbp', false);
+      properties['session'] = session;
+
+      setSessionSync(properties);
+      callCreateSession(properties);
+    };
+
+    cta.reportHit = function (type, hit) {
+      return new Promise(function (resolve, reject) {
+        initPromise.finally(function () {
+          var sessionId = getSessionId();
+          if (sessionId == null) {
+            sessionId = resetSessionId();
+            cta.session(sessionId, true);
+          }
+
+          cta.hit(type, hit, sessionId).then(resolve).catch(reject);
+        });
+      });
+    };
+
+    cta.hit = function (type, hit, sessionId) {
+      return new Promise(function (resolve, reject) {
+        let properties = {};
+        properties['sessionId'] = sessionId;
+        properties['clientId'] = getClientId();
+        properties['visitId'] = getVisitId();
+        properties['type'] = type;
+
+        hit['clientHitStartTime'] = new Date().getTime();
+        if (hit['host'] == undefined) {
+          hit['host'] = window.location.href;
+        }
+        hit['pageTitle'] = document.title;
+
+        properties['hit'] = hit;
+
+        fetch(settings.api_host + path + 'ReportHit/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(properties),
+        })
+            .then((response) => {
+              if (response.ok) {
+                return response.text();
+              } else {
+                throw new Error('Network response was not ok');
+              }
+            })
+            .then(resolve)
+            .catch(reject);
+      });
+    };
+
+    cta.clientId = function () {
+      return getClientId();
+    };
+
+    cta.sessionId = function () {
+      return getSessionId();
+    };
+    cta.visitId = function () {
+      return getVisitId();
+    };
+
+    cta.clearLead = function () {
+      removeCookie('leadId');
+    };
+
+    function generateUUID() {
+      var d = new Date().getTime();
+      if (window.performance && typeof window.performance.now === 'function') {
+        d += performance.now(); //use high-precision timer if available
+      }
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        var r = (d + Math.random() * 16) % 16 | 0;
+        d = Math.floor(d / 16);
+        return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+      });
+    }
+
+    function get_hostname(url) {
+      var m = url.match(/^https?:\/\/[^/]+/);
+      return m ? m[0] : null;
+    }
+
+    function setCookie(name, value, minutesToExpire) {
+      let date = new Date();
+      let expires;
+      if (minutesToExpire) {
+        date.setTime(date.getTime() + minutesToExpire * 60 * 1000);
+        expires = '; expires=' + date.toGMTString();
+      } else {
+        date.setTime(date.getTime() + 5 * 365 * 24 * 60 * 60 * 1000); //5years
+        expires = '; expires=' + date.toGMTString();
+      }
+      var domain = document.domain;
+      domain = domain.indexOf('connecteam.com') !== -1 ? 'connecteam.com' : domain;
+      domain = domain === 'localhost' ? domain : '.' + domain; //Work Correctly with debug
+      document.cookie = 'cta_' + name + '=' + value + expires + ';domain=' + domain + ';path=/';
+    }
+
+    function getCookie(name, is_cta = true) {
+      var nameEQ;
+      if (is_cta) {
+        nameEQ = 'cta_' + name + '=';
+      } else {
+        nameEQ = name + '=';
+      }
+      var ca = document.cookie.split(';');
+      for (var i = 0; i < ca.length; i++) {
+        var c = ca[i];
+        while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+      }
+      return null;
+    }
+
+    function removeCookie(name) {
+      setCookie(name, '', -1);
+    }
+
+    function getClientId() {
+      var clientId = getCookie('clientId');
+      if (clientId == null) {
+        clientId = generateUUID();
+        setCookie('clientId', clientId);
+      }
+      return clientId;
+    }
+
+    function getSessionId() {
+      return getCookie('sessionId');
+    }
+
+    function getVisitId() {
+      return getCookie(v1Cookie);
+    }
+
+    function getSessionSync() {
+      return getCookie('sessionSync');
+    }
+
+    function setSessionSync(payload) {
+      setCookie('sessionSync', JSON.stringify(payload), 30);
+    }
+
+    function clearSessionSync() {
+      removeCookie('sessionSync');
+    }
+
+    function initSessionSync() {
+      var properties = getSessionSync();
+      if (properties !== null) {
+        callCreateSession(properties);
+      }
+    }
+
+    function callCreateSession(properties) {
+      return fetch(settings.api_host + path + 'CreateSession/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json;charset=UTF-8',
+        },
+        body: JSON.stringify(properties),
+      })
+          .then((response) => {
+            if (response.ok) {
+              clearSessionSync();
+            } else {
+              throw new Error('Network response was not ok');
+            }
+          })
+          .catch((error) => {
+            console.error('There was a problem with creating session:', error);
+          });
+    }
+
+    function resetSessionId() {
+      var sessionId = generateUUID();
+      setCookie('sessionId', sessionId, 30);
+      return sessionId;
+    }
+
+    function initHeartbeatInterval() {
+      var body = document.getElementsByTagName('body');
+      body[0].onmousemove = function () {
+        isSessionActive = true;
+      };
+
+      setInterval(function () {
+        if (isSessionActive) {
+          // make not active till next mouse move
+          isSessionActive = false;
+
+          const sessionId = getSessionId();
+          if (sessionId == null) {
+            cta.session(resetSessionId(), true);
+          } else {
+            setCookie('sessionId', sessionId, 30);
+            var currentTime = new Date().getTime();
+            updateSessionHeartbeatTime(sessionId, currentTime);
+          }
+        }
+      }, HEARTBEAT_INTERVAL * 1000);
+    }
+
+    function updateSessionHeartbeatTime(sessionId, currentTime) {
+      var data = {
+        sessionId: sessionId,
+        clientSessionHeartbeatTime: currentTime,
+      };
+      fetch(settings.api_host + path + 'CreateSession/', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+    }
+
+    return cta;
+  }
+
+  //define globally if it doesn't already exist
+  if (typeof cta === 'undefined') {
+    window.cta = define_cta();
+  }
+})(window);

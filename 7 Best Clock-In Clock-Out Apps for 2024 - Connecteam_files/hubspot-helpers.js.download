@@ -1,0 +1,577 @@
+const SEPARATOR_INDICATOR = '[NEW-SLIDE]'
+
+const PHONE_VALIDATION_INDICATOR = '[PHONE-VALIDATION]'
+const PHONE_VALIDATION_MESSAGE = 'Phone number is invalid'
+
+const GOOGLE_PLACES_AUTO_COMPLETE_INDICATOR = '[PLACES-AUTOCOMPLETE]'
+const GOOGLE_PLACES_API_KEY = 'AIzaSyAqhAEC2n4zZAH-YwUM0PprugP7vigJvE0'
+const GOOGLE_PLACES_AUTO_COMPLETE_MIN_CHARACTERS = 5
+
+/**
+ * @see https://stackoverflow.com/a/41391872/24469176
+ * @param nodes {Node[]}
+ * @param wrapper {HTMLElement}
+ */
+function wrapAll (nodes, wrapper) {
+  // Cache the current parent and previous sibling of the first node.
+  const parent = nodes[0].parentNode
+  const previousSibling = nodes[0].previousSibling
+
+  // Place each node in wrapper.
+  //  - If nodes is an array, we must increment the index we grab from
+  //    after each loop.
+  //  - If nodes is a NodeList, each node is automatically removed from
+  //    the NodeList when it is removed from its parent with appendChild.
+  for (let i = 0; nodes.length - i; wrapper.firstChild === nodes[0] && i++) {
+    wrapper.appendChild(nodes[i])
+  }
+
+  // Place the wrapper just after the cached previousSibling,
+  // or if that is null, just before the first child.
+  const nextSibling = previousSibling ? previousSibling.nextSibling : parent.firstChild
+  parent.insertBefore(wrapper, nextSibling)
+}
+
+/**
+ * @param $group {HTMLElement}
+ * @return {boolean}
+ */
+const allInputsAreValid = $group =>
+    [...$group.querySelectorAll('input, textarea, select, fieldset')]
+        .every($el => $el.checkValidity())
+
+/** @type {AbortController} */
+let googlePlacesAutocompleteController = new AbortController()
+
+/**
+ * @param query {string}
+ * @return {Promise<any>}
+ */
+const googlePlacesAutocomplete = async (query) => {
+  googlePlacesAutocompleteController.abort()
+  googlePlacesAutocompleteController = new AbortController()
+
+  try {
+    return fetch('https://places.googleapis.com/v1/places:autocomplete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
+      },
+      body: JSON.stringify({
+        input: query,
+        includedPrimaryTypes: ['establishment'],
+      }),
+      signal: googlePlacesAutocompleteController.signal,
+    })
+        .then(res => res.json())
+        .catch(console.warn)
+  } catch (error) {
+    console.warn(error)
+  }
+}
+
+/**
+ * @param {HTMLInputElement} $field
+ * @param {string} message
+ * @param {boolean?} forceIsError
+ */
+function manuallySetHubspotFormFieldError ($field, message, forceIsError) {
+  const $fieldWrapper = $field.closest('.hs-form-field')
+
+  if (forceIsError === true || $field.checkValidity() === false) {
+    if (!$fieldWrapper.querySelector('.hs-error-msgs')) {
+      const $errors = document.createElement('ul')
+      $errors.className = 'no-list hs-error-msgs inputs-list'
+      $fieldWrapper.append($errors)
+    }
+
+    const $errors = $fieldWrapper.querySelector('.hs-error-msgs')
+    if ($errors.querySelectorAll(`[data-message="${message}"]`).length) return
+
+    const $message = document.createElement('li')
+    $message.dataset.message = message
+    $message.innerHTML = `<label class="hs-error-msg hs-main-font-element">${message}</label>`
+    $errors.append($message)
+  } else {
+    const $errors = $fieldWrapper.querySelector('.hs-error-msgs')
+    if ($errors) {
+      const $error = $errors.querySelector(`[data-message="${message}"]`)
+      $error.remove()
+      if (!$errors.querySelectorAll('li').length) {
+        $errors.remove()
+      }
+    }
+  }
+}
+
+  /**
+   * @param {HTMLFormElement} $form
+   * @param {string} formId
+   * @param {boolean} isProd
+   */
+  window.onHSFormReady = function ($form, formId, isProd) {
+    // set up presentational features for form fields
+    $form.querySelectorAll('input, textarea, select').forEach($el => {
+      if ($el.type === 'hidden') return
+
+      if (!$el.placeholder) {
+        $el.placeholder = ' '
+      }
+
+      if ($el.type === 'tel') {
+        $el.addEventListener('blur', () => {
+          $el.dataset.touched = ''
+        }, { once: true })
+      }
+    })
+
+    // populate submission id field
+    const $submissionIdField = $form.querySelector('input[name="form_submission_id"]')
+    if ($submissionIdField) {
+      const uuid = crypto.randomUUID()
+      $submissionIdField.value = uuid
+
+      window.cta.reportHit('actionHit', {
+        label: 'form_submission_id_created',
+        value: uuid,
+      }).catch(console.error)
+    }
+
+    // split into slides if needed
+    const $splitEls = /** @type HTMLElement[] */ [...$form.querySelectorAll(`.hs-field-desc`)]
+        .filter(el => el.textContent.includes(SEPARATOR_INDICATOR))
+
+    if ($splitEls.length) {
+      $form.classList.add('split-form')
+
+      // wrap each group of fieldsets in a slide, based on the last fieldset with a separator
+      const $slidesWrapper = /** @type HTMLDivElement*/ document.createElement('div')
+      $slidesWrapper.className = 'slides-wrapper'
+      let fieldsetsToWrap = []
+
+      function wrapCurrentFieldsetsInSlideAndReset () {
+        const $slideWrapper = document.createElement('div')
+        $slideWrapper.className = 'slide'
+        wrapAll(fieldsetsToWrap, $slideWrapper)
+        $slidesWrapper.append($slideWrapper)
+        fieldsetsToWrap = []
+      }
+
+      $form.querySelectorAll('fieldset').forEach($fieldset => {
+        fieldsetsToWrap.push($fieldset)
+
+        if ($fieldset.querySelector('.hs-field-desc')?.textContent.includes(SEPARATOR_INDICATOR)) {
+          wrapCurrentFieldsetsInSlideAndReset()
+        }
+      })
+
+      // add the .hs-submit to the last group
+      const $hsSubmit = $form.querySelector('.hs-submit')
+      if ($hsSubmit) {
+        fieldsetsToWrap.push($hsSubmit)
+      }
+
+      // wrap any remaining fieldsets
+      if (fieldsetsToWrap.length > 0) {
+        wrapCurrentFieldsetsInSlideAndReset()
+      }
+
+      // re-add the fields (inside slides) to the form
+      $form.prepend($slidesWrapper)
+      const $slides = $form.querySelectorAll('.slide')
+
+      $slides[0].dataset.active = ''
+
+      const slidesCount = $slides.length
+
+      const $progress = document.createElement('div')
+      $progress.className = 'slides-progress'
+
+      $slides.forEach(($slide, slideIndex) => {
+        const $slideIndicator = document.createElement('div')
+        $slideIndicator.className = 'slide-progress-indicator'
+        $slideIndicator.dataset.slideIndicator = slideIndex.toString()
+        if (slideIndex === 0) {
+          $slideIndicator.dataset.active = ''
+        }
+        $progress.append($slideIndicator)
+      })
+
+      const $prevButton = document.createElement('button')
+      $prevButton.type = 'button'
+      $prevButton.dataset.slideControlPrev = ''
+      $prevButton.className = 'slide-button slide-prev slide-prev-button'
+      $prevButton.innerHTML = '<span>Back</span>'
+
+      const $nextButton = document.createElement('button')
+      $nextButton.type = 'button'
+      $nextButton.dataset.slideControlNext = ''
+      $nextButton.className = 'slide-button slide-next-button'
+      $nextButton.innerHTML = '<span>Next</span>'
+
+      const $nextButtonWrapper = document.createElement('div')
+      $nextButtonWrapper.className = 'slide-next'
+      $nextButtonWrapper.innerHTML = `<div class="legal-consent-container"><div class="hs-richtext"><p>By clicking "Next" I acknowledge Connecteam's <a href="https://connecteam.com/privacy/" rel="noopener">Privacy Notice.</a>We may contact you about our products and services; You may always opt out from our mailing lists in accordance with the Privacy Notice.</p></div></div>`
+      $nextButtonWrapper.append($nextButton)
+
+      const $controls = document.createElement('div')
+      $controls.className = 'slide-controls'
+      $controls.append($prevButton, $nextButtonWrapper)
+
+      // set up state
+      let currentSlide = 0
+
+      function setState (targetIndex = currentSlide, fromButton = false) {
+        const _currentSlide = currentSlide
+        // use inert to prevent focus on hidden slides and mark them as inactive
+        $slides.forEach($slide => $slide.setAttribute('inert', ''))
+        $progress.querySelector(`[data-slide-indicator="${currentSlide}"]`).removeAttribute('data-active')
+
+        // guard against invalid targetIndex
+        if (targetIndex >= 0 && targetIndex < slidesCount) {
+          currentSlide = targetIndex
+        }
+
+        $slidesWrapper.style.setProperty('--current-slide', currentSlide)
+
+        const $currentSlide = [...$slides].at(currentSlide)
+        $currentSlide.removeAttribute('inert')
+        $progress.querySelector(`[data-slide-indicator="${currentSlide}"]`).setAttribute('data-active', '')
+
+        if (fromButton) {
+          $progress.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+          // focus first input on the new slide
+          // after the slide is done transitioning
+          const $firstInput = $currentSlide.querySelector('input, textarea, select')
+          $currentSlide.addEventListener('transitionend', function () {
+            $firstInput.focus()
+          })
+
+          // send to bi
+          window.onHSFormSubmit($form, formId, isProd)
+
+          // send to GA
+          if (_currentSlide < currentSlide) {
+            window.sendGAEvent('step_completion', {
+              step_name: _currentSlide + 1,
+            })
+          } else if (_currentSlide > currentSlide) {
+            window.sendGAEvent('click_back', {
+              step_name: _currentSlide + 1,
+            })
+          }
+        }
+
+        // update controls
+        if (currentSlide === 0) {
+          $prevButton.setAttribute('disabled', '')
+        } else {
+          $prevButton.removeAttribute('disabled')
+        }
+
+        // hide next button on last slide
+        // and disable it if there are errors
+        if (currentSlide === slidesCount - 1) {
+          $nextButtonWrapper.classList.add('hidden')
+        } else {
+          $nextButtonWrapper.classList.remove('hidden')
+          if (!allInputsAreValid($currentSlide)) {
+            $nextButton.setAttribute('disabled', '')
+          } else {
+            $nextButton.removeAttribute('disabled')
+          }
+        }
+
+        // disable submit button if there are errors
+        if (!allInputsAreValid($form)) {
+          $hsSubmit.querySelector('[type=submit]').setAttribute('disabled', '')
+        } else {
+          $hsSubmit.querySelector('[type=submit]').removeAttribute('disabled')
+        }
+      }
+
+      // set up controls
+      $prevButton.addEventListener('click', () => setState(currentSlide - 1, true))
+
+      $nextButton.addEventListener('click', () => setState(currentSlide + 1, true))
+
+      // add controls to form
+      $form.prepend($progress)
+      $form.append($controls)
+
+      // set up initial state
+      setState()
+
+      // set state on input change
+      // + disable next button if there are errors
+      function onInputOrBlur () {
+        setState()
+
+        setTimeout(() => {
+          if (([...$slides].at(currentSlide).querySelector('.hs-error-msgs'))) {
+            $nextButton.setAttribute('disabled', '')
+          }
+        }, 100)
+      }
+
+      $form.addEventListener('input', onInputOrBlur)
+      $form.addEventListener('blur', onInputOrBlur)
+    }
+
+    // custom validation for phone number
+    const $phoneFieldsToValidate = /** @type {HTMLElement[]} */ [...$form.querySelectorAll('.hs-field-desc')]
+        .filter(el => el.textContent.includes(PHONE_VALIDATION_INDICATOR))
+    if ($phoneFieldsToValidate.length) {
+      // load phone validation script
+      const validationScript = document.createElement('script')
+      validationScript.src = 'https://unpkg.com/libphonenumber-js@latest/bundle/libphonenumber-max.js'
+      document.head.appendChild(validationScript)
+
+      $phoneFieldsToValidate.forEach($phoneFieldToValidate => {
+        const $phoneField = /** @type {HTMLInputElement} */ $phoneFieldToValidate.closest('.hs-form-field').querySelector('input[type="tel"]')
+
+        // set input validity based on phone validation
+        function validatePhoneInput () {
+          if (!window.libphonenumber) return
+
+          const { isValidPhoneNumber } = window.libphonenumber
+          const value = $phoneField.value
+
+          if (!isProd) {
+            console.log('isValidPhoneNumber', isValidPhoneNumber(value))
+          }
+
+          if (!isValidPhoneNumber(value)) {
+            $phoneField.setCustomValidity(PHONE_VALIDATION_MESSAGE)
+          } else {
+            $phoneField.setCustomValidity('')
+          }
+        }
+
+        $phoneField.addEventListener('input', () => {
+          validatePhoneInput()
+
+          // don't show error message if the field hasn't been blurred at least once
+          if (typeof $phoneField.dataset.touched !== 'undefined') {
+            manuallySetHubspotFormFieldError($phoneField, PHONE_VALIDATION_MESSAGE)
+          }
+        })
+
+        $phoneField.addEventListener('blur', () => {
+          manuallySetHubspotFormFieldError($phoneField, PHONE_VALIDATION_MESSAGE)
+        })
+
+        // wait for phone validation script to load
+        // and then validate existing values
+        let attempt = 0
+        function initialPhoneValidation () {
+          if (!window.libphonenumber && attempt < 100) {
+            setTimeout(initialPhoneValidation, 100)
+            attempt++
+          } else {
+            validatePhoneInput()
+            if (!isProd) {
+              console.log('Phone validation script loaded', { attempt })
+            }
+          }
+        }
+        initialPhoneValidation()
+      })
+    }
+
+    // google places autocomplete
+    const $placesAutocompleteFields = /** @type {HTMLElement[]} */ [...$form.querySelectorAll(`.hs-field-desc`)]
+        .filter(el => el.textContent.includes(GOOGLE_PLACES_AUTO_COMPLETE_INDICATOR))
+    if ($placesAutocompleteFields.length) {
+      $placesAutocompleteFields.forEach($placesAutocompleteField => {
+        const $input = /** @type HTMLInputElement */ $placesAutocompleteField.closest('.hs-form-field').querySelector('input[type="text"]')
+        const $inputWrapper = $input.closest('.field')
+        const $placeIdField = /** @type HTMLInputElement */ $form.querySelector('input[name="place_id"]')
+
+        const $predictions = document.createElement('ul')
+        $predictions.className = 'predictions'
+        $inputWrapper.append($predictions)
+
+        document.body.addEventListener('click', function (e) {
+          if (!e.target.closest('ul.predictions')) {
+            $predictions.innerHTML = ''
+          }
+        })
+
+        $input.addEventListener('input', async function (e) {
+          const query = $input.value
+
+          if (!query || query.length < GOOGLE_PLACES_AUTO_COMPLETE_MIN_CHARACTERS) return
+
+          const data = await googlePlacesAutocomplete(query)
+          $predictions.innerHTML = '' // after await to prevent flicker
+
+          if (!data || !data?.suggestions?.length) return
+
+          if (!isProd) {
+            console.log({ data })
+          }
+
+          $placeIdField.value = ''
+
+          data.suggestions.forEach(suggestion => {
+            const prediction = suggestion.placePrediction
+            const $prediction = document.createElement('li')
+            $prediction.innerHTML = `<button>${prediction.text.text}</button>`
+
+            $prediction.addEventListener('click', function () {
+              $input.value = prediction.text.text
+              $placeIdField.value = prediction.placeId
+              $predictions.innerHTML = ''
+            })
+
+            $predictions.append($prediction)
+          })
+        })
+      })
+    }
+
+    // remove all separators
+    $splitEls.map($el => $el.remove())
+    $phoneFieldsToValidate.map($el => $el.remove())
+    $placesAutocompleteFields.map($el => $el.remove())
+
+    window.addEventListener('message', function (event) {
+      if (event.origin !== 'https://connecteam.na.chilipiper.com') return
+
+      if (!isProd) {
+        console.log('chilipiper: ', event.data)
+      }
+
+      if (event.data?.action === 'booking-confirmed') {
+        window.sendGAEvent('booking_confirmed')
+      }
+    })
+
+    for (const fn of window.onHBFormReadyCallbacks) {
+      fn($form, formId, isProd)
+    }
+  }
+
+  /**
+   * @param {HTMLFormElement} $form
+   * @param {string} formId
+   * @param {boolean} isProd
+   */
+  window.onHSFormSubmit = function ($form, formId, isProd) {
+    const formObj = {}
+    for (let [name, value] of new FormData($form)) {
+      formObj[name] = value
+    }
+
+    window.sendGAEvent('form_submission', {
+      form_id: formId,
+      form_values: window.formValuesToCSV(formObj, ['numofemployeesrange', 'TICKET.company_size_bucket']),
+    })
+
+    if (window.cta) {
+      const data = {
+        biClientId: window.cta.clientId(),
+        sessionClientId: window.cta.sessionId(),
+        visitId: window.cta.visitId(),
+        ...formObj,
+        form: formId,
+        timestamp: Date.now(),
+      }
+
+      if (!isProd) {
+        console.log({ biData: data })
+      }
+
+      fetch('https://bi.connecteam.com/bi/api/LeadForm/MarketingSite/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+        cache: 'no-store',
+      })
+          .then(response => response.json())
+          .then(data => { if (!isProd) console.log({ biResponse: data }) })
+          .catch(error => console.error('Error:', error))
+    }
+
+    for (const fn of window.onHBFormSubmitCallbacks) {
+      fn($form, formId, isProd)
+    }
+
+    if (window.cta) {
+      window.cta.reportHit('actionHit', {
+        label: 'form_loaded',
+        value: formId,
+      }).catch(console.error)
+    }
+  }
+
+  /**
+   * @param {HTMLFormElement} $form
+   * @param {{redirectUrl: string, submissionValues: Object}} data
+   * @param {string} formId
+   * @param {boolean} isProd
+   */
+  window.onHSFormSubmitted = function ($form, data, formId, isProd) {
+    function injectVideo () {
+      let attempt = 0
+
+      function replace () {
+        /** @type {HTMLElement} $videoPlaceholder */
+        const $videoPlaceholder = [...$form.querySelectorAll('p')]
+            .find($p => $p.textContent.includes("[video]"))
+        if ($videoPlaceholder) {
+          const $video = document.createElement('iframe')
+          $video.src = 'https://player.vimeo.com/video/848743252?autoplay=1&api=1&player_id=vimeo_id_0'
+          $video.width = '560'
+          $video.height = '315'
+          $video.frameBorder = '0'
+          $video.allow = 'picture-in-picture'
+          $video.allowFullscreen = ''
+          $video.style.width = '100%'
+          $video.style.aspectRatio = '16/9'
+          $video.style.height = 'auto'
+          $video.style.borderRadius = '12px'
+          $videoPlaceholder.replaceWith($video)
+        } else if (attempt < 100) {
+          attempt++
+          if (!isProd) {
+            console.log({ injectVideoAttempt: attempt })
+          }
+          setTimeout(replace, 50)
+        }
+      }
+
+      replace()
+    }
+
+    injectVideo()
+
+    async function sendHashedData () {
+      if (data.submissionValues['email']) {
+        const hashedEmail = await window.hash256hex(data.submissionValues['email'])
+        window.sendGAEvent('form_hashed_email', { hashed_email: hashedEmail })
+      }
+
+      if (data.submissionValues['phone']) {
+        const hashedPhone = await window.hash256hex(data.submissionValues['phone'])
+        window.sendGAEvent('form_hashed_phone', { hashed_phone: hashedPhone })
+      }
+    }
+
+    sendHashedData()
+        .finally(() => {
+          if(data.submissionValues['form_submission_id']) {
+            window.sendGAEvent('form_submission_id', { form_submission_id: data.submissionValues['form_submission_id'] })
+          }
+          window.sendGAEvent('form_submitted')
+        })
+
+    for (const fn of window.onHBFormSubmittedCallbacks) {
+      fn($form, formId, isProd)
+    }
+  }

@@ -1,0 +1,20 @@
+jQuery(document).ready(function ($) {
+
+    // Init
+    var tg = {};
+    window.tg = tg;
+
+
+    // Globals
+    tg.globals = {}
+    tg.globals.utms = [
+        'utm_source',
+        'utm_medium',
+        'utm_campaign',
+        'utm_term',
+        'utm_content',
+    ];
+
+
+
+});
