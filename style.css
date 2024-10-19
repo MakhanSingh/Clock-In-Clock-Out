@@ -173,7 +173,7 @@ figure {
 .ms-pricing-box {
     background: #2998ff0d;
     border-radius: 12px;
-    padding: 12px;
+    padding: 20px;
     margin: 0 -12px -12px;
 }
 .ms-pricing-box p span:not(:first-child):before {
@@ -188,11 +188,42 @@ summary:after {
     color: #2998ff;
     content: "⯈";
 }
+.ms-table {
+    overflow: hidden;
+    overflow-x: scroll;
+}
+.ms-table th {
+    font-size: 16px;
+    padding: 12px;
+}
+.ms-table td {
+    font-size: 15px;
+    text-align: center;
+    padding: 12px;
+}
+.ms-table img {
+    height: 36px;
+}
+.ms-table tr:nth-child(even) {
+    background: #f8fafc;
+}
+.ms-table tr:first-child td:first-child {
+    min-width: 100px;
+}
+.ms-table tr:first-child td {
+    min-width: 270px;
+}
+.ms-table-wrapper {
+    border: 1px solid #D8DEE3;
+    border-radius: 20px;
+    margin: 20px 0;
+    padding: 20px 0;
+}
 /*----- General CSS End -----*/
 
 /*----- Banner Section CSS Start -----*/
 .ms-banner-section {
-    padding: 80px 10px;
+    padding: 80px 20px;
 }
 .ms-banner-section .ms-main-img {
     border-radius: 24px;
@@ -334,3 +365,40 @@ summary:after {
     height: 24px;
 }
 /*----- Main Content Section CSS End -----*/
+
+@media (max-width:991px) {
+    h1 {
+        font-size: 30px;
+    }
+    h2 {
+        font-size: 24px;
+    }
+    h3 {
+        font-size: 20px;
+    }
+    body, p {
+        font-size: 16px;
+    }
+    .ms-banner-section {
+        padding: 50px 0;
+    }
+    .ms-top-picks-box img {
+        width: 130px;
+    }
+    .ms-top-picks .col-md-7 .col-md-6:last-child .ms-top-picks-box img {
+        width: 90px;
+    }
+    .ms-step:after {
+        right: -14px;
+    }
+    .ms-features-list {
+        -moz-columns: 1;
+        columns: 1;
+    }
+    .ms-top-picks {
+        margin: 0;
+    }
+    .ms-pricing-box {
+        margin: 0 0 -12px;
+    }
+}
