@@ -5,6 +5,13 @@ body {
     color: #222;
     font-family: 'Inter';
 }
+a {
+    text-decoration: none;
+    color: #2381D9;
+}
+a:hover {
+    text-decoration: underline;
+}
 h1, h2, h3, h4, h5, h6 {
     font-family: 'Poppins';
 }
@@ -28,11 +35,20 @@ h3 {
     margin: 1.25em 0 0.5em;
     line-height: 1.45;
 }
+h6 {
+    font-size: 16px;
+    font-family: 'Inter';
+    color: #222;
+}
 p {
     font-size: 19px;
     font-family: 'Inter';
     color: #222;
     margin: 0.85em 0;
+}
+.ms-font-14 {
+    font-size: 14px;
+    line-height: 1.2;
 }
 .ms-font-poppoins {
     font-family: 'Poppins';
@@ -49,6 +65,110 @@ p {
 }
 .ms-arrow-list li {
     margin: 0.65em 0;
+}
+.ms-features-list {
+    list-style: none;
+    -moz-columns: 2;
+    columns: 2;
+    -moz-column-gap: 12px;
+    column-gap: 12px;
+}
+.ms-features-list li {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.ms-features-list li:before {
+    content: url('assets/images/blue.svg');
+}
+.ms-pros-list, .ms-cons-list {
+    columns: 1;
+}
+.ms-pros-list li:before {
+    content: url('assets/images/green.svg');
+}
+.ms-cons-list li:before {
+    content: url('assets/images/red.svg');
+}
+.ms-yellow-btn {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0D134C;
+    background: #FEC006;
+    border-radius: 6px;
+    font-family: 'Poppins';
+    padding: 5px 10px;
+    transition: 0.3s all linear;
+}
+.ms-yellow-btn:hover {
+    background: #FEDF82;
+    text-decoration: none;
+}
+.ms-link {
+    font-size: 15px;
+    font-weight: 600;
+}
+.ms-hr {
+    border-top-color: #D8DEE3;
+    opacity: 1;
+}
+figure {
+    border-radius: 12px;
+    padding: 12px;
+    border: 1px solid #d8dee3;
+}
+.ms-quote-box {
+    padding: 20px;
+    background: rgba(234, 245, 255, 0.5);
+    border-radius: 18px;
+}
+.ms-quote-box q {
+    color: #0b3858;
+}
+.ms-quote-box q:before {
+    position: absolute;
+    right: 100%;
+}
+.ms-quote-box .ms-quote-name {
+    color: #7d98aa;
+}
+.ms-quote-box .ms-quote-name em:first-child b {
+    font-style: normal;
+}
+.ms-quote-box .ms-quote-name em:first-child:after {
+    content: '|';
+    padding-left: 6px;
+}
+.ms-special-links {
+    margin-inline: calc(-1* 24px);
+}
+.ms-special-links a {
+    padding: 12px;
+    border: 1px solid #e7ecee;
+    border-radius: 12px;
+    line-height: 1.25;
+    color: #2998ff;
+    gap: 12px;
+    transition: 0.3s all linear;
+    height: 74px;
+}
+.ms-special-links a:hover {
+    border-color: #94cbff;
+}
+.ms-special-links a:after {
+    transition: 0.3s all linear;
+}
+.ms-special-links a:hover:after {
+    translate: 0.25em 0;
+}
+.ms-special-links a > div {
+    gap: 12px;
+}
+.ms-special-links a:after {
+    content: "→";
+    display: inline-block;
+    font-weight: 700;
+    margin-inline-end: 12px;
 }
 /*----- General CSS End -----*/
 
@@ -89,3 +209,105 @@ p {
 }
 
 /*----- Banner Section CSS End -----*/
+
+/*----- Main Content Section CSS Start ----*/
+.ms-top-picks {
+    background-color: #F9FAFB;
+    margin-block: 2em;
+    margin-inline: calc(-1* 24px);
+    padding: 24px;
+    border-radius: 24px;
+}
+.ms-top-picks-box {
+    background: #fff;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, .1);
+    padding: 18px;
+    border-radius: 12px;
+}
+.ms-top-picks-box .ms-picks-number {
+    background-color: #2381d9;
+    color: #fff;
+    font-size: 32px;
+    font-weight: 700;
+    font-family: 'Inter';
+    position: absolute;
+    width: 48px;
+    height: 48px;
+    border-radius: 0 12px;
+    top: 0;
+    right: 0;
+}
+.ms-top-picks-box .ms-picks-unhighlight {
+    width: 36px;
+    height: 36px;
+    font-size: 24px;
+    background: #94CBFF;
+}
+.ms-top-picks .ms-bottom-heading {
+    color: #0b3858;
+    letter-spacing: 0.09em;
+    font-weight: 600;
+    font-size: 14px;
+}
+.ms-steps {
+    gap: 21px;
+}
+.ms-step {
+    background: #fff;
+    border: 1px solid #e7ecee;
+    padding: 12px;
+    border-radius: 9px;
+    position: relative;
+}
+.ms-step:after {
+    content: url('assets/images/right-arrow.svg');
+    position: absolute;
+    top: 25px;
+    right: -22px;
+}
+.ms-step:last-child:after {
+    display: none;
+}
+.ms-step .ms-step-title {
+    color:#0b3858;
+}
+.ms-step-last img {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+}
+.ms-main-box {
+    margin-inline: calc(-1* 24px);
+    border-radius: 24px;
+    padding: 24px;
+    box-shadow: 0 0 6px #0000001c;
+}
+.ms-main-box-number {
+    color: #fff;
+    background: #2998ff;
+    font-size: 32px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    font-weight: 700;
+}
+.ms-main-logo {
+    height: 36px;
+}
+.ms-available-sidebar {
+    border-left: 1px solid #d8dee3;
+}
+.ma-available-text {
+    font-size: 10px;
+    color: #a9b9c7;
+    font-weight: 600;
+    line-height: 1.45;
+    letter-spacing: 0.5px;
+}
+.ms-available-icons a {
+    transition: 0.3s all linear;
+}
+.ms-available-icons a:hover {
+    filter: drop-shadow(0 0 0 rgb(0, 0, 0));
+}
+/*----- Main Content Section CSS End -----*/
