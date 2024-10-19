@@ -168,7 +168,25 @@ figure {
     content: "→";
     display: inline-block;
     font-weight: 700;
-    margin-inline-end: 12px;
+    margin-right: 12px;
+}
+.ms-pricing-box {
+    background: #2998ff0d;
+    border-radius: 12px;
+    padding: 12px;
+    margin: 0 -12px -12px;
+}
+.ms-pricing-box p span:not(:first-child):before {
+    content: "•";
+    display: inline-block;
+    margin: 0 10px;
+}
+summary {
+    display: flex;
+}
+summary:after {
+    color: #2998ff;
+    content: "⯈";
 }
 /*----- General CSS End -----*/
 
@@ -276,12 +294,12 @@ figure {
     top: 15px;
     right: 15px;
 }
-.ms-main-box {
+/* .ms-main-box {
     margin-inline: calc(-1* 24px);
     border-radius: 24px;
     padding: 24px;
     box-shadow: 0 0 6px #0000001c;
-}
+} */
 .ms-main-box-number {
     color: #fff;
     background: #2998ff;
@@ -292,22 +310,27 @@ figure {
     font-weight: 700;
 }
 .ms-main-logo {
-    height: 36px;
+    height: 40px;
 }
 .ms-available-sidebar {
     border-left: 1px solid #d8dee3;
+    padding-left: 12px;
+    margin-left: 12px;
 }
 .ma-available-text {
-    font-size: 10px;
+    font-size: 14px;
     color: #a9b9c7;
     font-weight: 600;
     line-height: 1.45;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.7px;
 }
 .ms-available-icons a {
     transition: 0.3s all linear;
 }
 .ms-available-icons a:hover {
     filter: drop-shadow(0 0 0 rgb(0, 0, 0));
+}
+.ms-main-box-connecteam .ms-main-logo {
+    height: 24px;
 }
 /*----- Main Content Section CSS End -----*/
