@@ -13,8 +13,7 @@ a:hover {
     text-decoration: underline;
 }
 h1, h2, h3, h4, h5, h6 {
-    /* font-family: 'Poppins'; */
-    font-family: 'Inter';
+    font-family: 'Poppins';
 }
 h1 {
     font-weight: 600;
@@ -52,8 +51,7 @@ p {
     line-height: 1.2;
 }
 .ms-font-poppoins {
-    /* font-family: 'Poppins'; */
-    font-family: 'Inter';
+    font-family: 'Poppins';
 }
 .ms-font-inter {
     font-family: 'Inter';
